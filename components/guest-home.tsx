@@ -120,7 +120,7 @@ export function GuestHome({ userRole }: GuestHomeProps) {
         </div>
 
         {/* Call to Action */}
-        {!user && (
+        {!userRole && (
         <div className="text-center">
           <Card className="bg-gradient-to-r from-violet-900/50 to-lime-900/50 border-lime-400/30 max-w-2xl mx-auto">
             <CardHeader>
