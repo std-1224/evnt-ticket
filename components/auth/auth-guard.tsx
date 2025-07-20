@@ -43,7 +43,6 @@ export function AuthGuard({ children }: AuthGuardProps) {
     // Check if current route is protected
     const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route))
 
-    console.log('AuthGuard - Path:', pathname, 'Protected:', isProtectedRoute, 'User:', !!user)
 
     // If user is not authenticated and trying to access a protected route
     if (!user && isProtectedRoute) {
@@ -54,7 +53,6 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     // If user is authenticated and trying to access auth pages, redirect to home
     if (user && pathname === '/auth') {
-      console.log('Redirecting to home - user on auth page')
       router.push('/')
       return
     }

@@ -42,8 +42,6 @@ export default function ProfilePage() {
     avatar_url: ''
   })
 
-      console.log("Is Google User:", user)
-
   // Check if user is logged in via Google OAuth
   const isGoogleUser = profile?.provider === 'google' || user?.app_metadata?.provider === 'google'
 
@@ -77,9 +75,6 @@ export default function ProfilePage() {
           created_at: user.created_at || new Date().toISOString(),
           updated_at: user.updated_at || new Date().toISOString(),
         }
-
-        console.log('Google user profile from OAuth data:', googleProfile)
-        console.log('Google user metadata:', user.user_metadata)
 
         setProfile(googleProfile)
         setFormData({
@@ -491,11 +486,11 @@ export default function ProfilePage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Account Status</Label>
-                  <p className="text-sm text-muted-foreground bg-zinc-800/50 p-3 rounded-md">
+                  <div className="text-sm text-muted-foreground bg-zinc-800/50 p-3 rounded-md">
                     <Badge variant={'default'}>
                       active
                     </Badge>
-                  </p>
+                  </div>
                 </div>
               </div>
             </div>

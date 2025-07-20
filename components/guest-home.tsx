@@ -33,8 +33,6 @@ export function GuestHome({ userRole }: GuestHomeProps) {
     return 'View Event Details'
   }
 
-  console.log("GuestHome - User role:", userRole)
-
   const getTicketsText = () => {
     if (userRole === 'buyer') return 'My Tickets'
     if (userRole === 'admin' || userRole === 'scanner') return 'Manage Events'

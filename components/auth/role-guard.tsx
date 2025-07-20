@@ -57,14 +57,11 @@ export function RoleGuard({ children }: RoleGuardProps) {
 
     // Check if current route requires specific roles
     const requiredRoles = getRequiredRoles(pathname)
-    
-    console.log('RoleGuard - Path:', pathname, 'Required roles:', requiredRoles, 'User role:', userRole)
 
     // If route has role requirements
     if (requiredRoles.length > 0) {
       // Check if user has required role
       if (!hasAnyRole(requiredRoles)) {
-        console.log('Access denied - redirecting to appropriate page')
         // Redirect to appropriate default page based on user role
         const defaultRoute = DEFAULT_REDIRECTS[userRole as keyof typeof DEFAULT_REDIRECTS] || '/'
         router.push(defaultRoute)
@@ -106,57 +103,57 @@ export function RoleGuard({ children }: RoleGuardProps) {
   // Check role permissions for current route
   const requiredRoles = getRequiredRoles(pathname)
   
-  if (requiredRoles.length > 0 && !hasAnyRole(requiredRoles)) {
-    // Show access denied page
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-              <Shield className="h-6 w-6 text-destructive" />
-            </div>
-            <CardTitle className="text-xl">Acceso Denegado</CardTitle>
-            <CardDescription>
-              No tienes permisos para acceder a esta página
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg bg-muted p-3">
-              <div className="flex items-center gap-2 text-sm">
-                <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">
-                  Tu rol actual: <span className="font-medium capitalize">{userRole}</span>
-                </span>
-              </div>
-              <div className="mt-2 text-sm text-muted-foreground">
-                Roles requeridos: {requiredRoles.map(role => 
-                  <span key={role} className="font-medium capitalize">{role}</span>
-                ).join(', ')}
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                onClick={() => router.back()} 
-                variant="outline" 
-                className="flex-1"
-              >
-                Volver
-              </Button>
-              <Button 
-                onClick={() => {
-                  const defaultRoute = DEFAULT_REDIRECTS[userRole as keyof typeof DEFAULT_REDIRECTS] || '/'
-                  router.push(defaultRoute)
-                }} 
-                className="flex-1"
-              >
-                Ir al Inicio
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
+  // if (requiredRoles.length > 0 && !hasAnyRole(requiredRoles)) {
+  //   // Show access denied page
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center bg-background p-4">
+  //       <Card className="w-full max-w-md">
+  //         <CardHeader className="text-center">
+  //           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+  //             <Shield className="h-6 w-6 text-destructive" />
+  //           </div>
+  //           <CardTitle className="text-xl">Acceso Denegado</CardTitle>
+  //           <CardDescription>
+  //             No tienes permisos para acceder a esta página
+  //           </CardDescription>
+  //         </CardHeader>
+  //         <CardContent className="space-y-4">
+  //           <div className="rounded-lg bg-muted p-3">
+  //             <div className="flex items-center gap-2 text-sm">
+  //               <AlertCircle className="h-4 w-4 text-muted-foreground" />
+  //               <span className="text-muted-foreground">
+  //                 Tu rol actual: <span className="font-medium capitalize">{userRole}</span>
+  //               </span>
+  //             </div>
+  //             <div className="mt-2 text-sm text-muted-foreground">
+  //               Roles requeridos: {requiredRoles.map(role => 
+  //                 <span key={role} className="font-medium capitalize">{role}</span>
+  //               ).join(', ')}
+  //             </div>
+  //           </div>
+  //           <div className="flex gap-2">
+  //             <Button 
+  //               onClick={() => router.back()} 
+  //               variant="outline" 
+  //               className="flex-1"
+  //             >
+  //               Volver
+  //             </Button>
+  //             <Button 
+  //               onClick={() => {
+  //                 const defaultRoute = DEFAULT_REDIRECTS[userRole as keyof typeof DEFAULT_REDIRECTS] || '/'
+  //                 router.push(defaultRoute)
+  //               }} 
+  //               className="flex-1"
+  //             >
+  //               Ir al Inicio
+  //             </Button>
+  //           </div>
+  //         </CardContent>
+  //       </Card>
+  //     </div>
+  //   )
+  // }
 
   // Render children if user has proper permissions
   return <>{children}</>
