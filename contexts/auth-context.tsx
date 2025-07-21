@@ -39,11 +39,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true)
   const [creatingUser, setCreatingUser] = useState<Set<string>>(new Set())
   const [customUserData, setCustomUserData] = useState<any>(null)
+  const [customUserDataLoading, setCustomUserDataLoading] = useState(false)
   const router = useRouter()
 
   // Function to fetch user data from custom users table
   const fetchCustomUserData = async (userId: string) => {
+    setCustomUserDataLoading(true)
     try {
+      console.log('Fetching custom user data for:', userId)
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -59,10 +62,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return null
       }
 
+      console.log('Custom user data fetched:', data)
       return data
     } catch (error) {
       console.error('Error fetching custom user data:', error)
       return null
+    } finally {
+      setCustomUserDataLoading(false)
     }
   }
 
@@ -343,10 +349,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return userRole ? roles.includes(userRole) : false
   }
 
+  // Effect to fetch custom user data when user changes
+  useEffect(() => {
+    const fetchUserDataIfNeeded = async () => {
+      if (user && !customUserData && !customUserDataLoading && !loading) {
+        console.log('User exists but no custom data, fetching...')
+        const customData = await fetchCustomUserData(user.id)
+        setCustomUserData(customData)
+      }
+    }
+
+    fetchUserDataIfNeeded()
+  }, [user, customUserData, customUserDataLoading, loading])
+
+  // Calculate overall loading state - we're loading if:
+  // 1. Auth is still loading, OR
+  // 2. We're currently fetching custom user data, OR
+  // 3. We have a user but no custom data yet
+  const isLoading = loading || customUserDataLoading || (!!user && !customUserData)
+
   const value = {
     user,
     session,
-    loading,
+    loading: isLoading,
     signOut,
     userRole,
     userFullName,
