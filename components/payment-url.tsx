@@ -52,7 +52,8 @@ export function PaymentUrl({ paymentUrl, isOpen, onClose, onConfirm }: PaymentUr
             <Button
               onClick={() => {
                 window.open(paymentUrl, '_blank');
-                onConfirm();
+                // Don't call onConfirm here to prevent modal from closing
+                // onConfirm will be called when payment is successful or user manually closes
               }}
               className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
             >

@@ -33,6 +33,7 @@ export function BuyerLayout({ children }: BuyerLayoutProps) {
       'events': 'Browse Events',
       'event': 'Event Details',
       'tickets': 'My Tickets',
+      'orders': 'My Orders',
       'cart': 'Shopping Cart',
       'payment': 'Payment',
       'confirmation': 'Order Confirmation',

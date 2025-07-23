@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { apiClient, Event, EventWithTicketTypes, Ticket } from '@/lib/api'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { apiClient, Event, EventWithTicketTypes, Ticket, Purchase } from '@/lib/api'
 import { useAuth } from '@/contexts/auth-context'
 import { supabase } from '@/lib/supabase'
 
@@ -151,8 +151,9 @@ export function useUserTickets() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
 
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async (retryCount = 0) => {
     if (!user?.id) {
       setTickets([])
       setLoading(false)
@@ -162,25 +163,70 @@ export function useUserTickets() {
     try {
       setLoading(true)
       setError(null)
-      const response = await apiClient.getUserTickets(user.id)
-      setTickets(response.tickets)
+
+      console.log(`Fetching tickets for user: ${user.id} (attempt ${retryCount + 1})`)
+
+      // Increase timeout to 20 seconds for complex queries
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('The request is taking longer than expected. This might be due to a slow database connection. Please try again.')), 1000)
+      )
+
+      const response = await Promise.race([
+        apiClient.getUserTickets(user.id),
+        timeoutPromise
+      ]) as { tickets: Ticket[] }
+
+      console.log('Successfully fetched tickets:', response.tickets?.length || 0)
+      setTickets(response.tickets || [])
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch tickets')
       console.error('Error fetching user tickets:', err)
-    } finally {
+
+      // Retry logic for network errors (but not for timeout errors)
+      if (retryCount < 2 && !err.message.includes('timeout') && !err.message.includes('Request timeout')) {
+        console.log(`Retrying in ${(retryCount + 1) * 500}ms...`)
+        setRetrying(true)
+        setTimeout(() => {
+          fetchTickets(retryCount + 1)
+        }, (retryCount + 1) * 500) // 1s, 2s delay
+        return
+      }
+
+      setRetrying(false)
+
+      // Provide more specific error messages
+      let errorMessage = 'Failed to fetch tickets'
+      if (err.message.includes('timeout') || err.message.includes('Request timeout')) {
+        errorMessage = 'Loading is taking longer than expected. Please check your internet connection and try again.'
+      } else if (err.message.includes('network') || err.message.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.'
+      } else if (err.message) {
+        errorMessage = err.message
+      }
+
+      setError(errorMessage)
+      setTickets([]) // Set empty array on error
       setLoading(false)
+    } finally {
+      if (retryCount === 0) { // Only set loading false on the initial call
+        setLoading(false)
+      }
     }
-  }
+  }, [user?.id])
 
   useEffect(() => {
     fetchTickets()
-  }, [user?.id])
+  }, [fetchTickets])
+
+  const refetch = useCallback(() => {
+    fetchTickets(0) // Always start with retry count 0 for manual refetch
+  }, [fetchTickets])
 
   return {
     tickets,
     loading,
     error,
-    refetch: fetchTickets
+    retrying,
+    refetch
   }
 }
 
@@ -262,5 +308,44 @@ export function useTicket(ticketId: string) {
     ticket,
     loading,
     error
+  }
+}
+
+// Hook for fetching user purchases
+export function useUserPurchases() {
+  const { user } = useAuth()
+  const [purchases, setPurchases] = useState<Purchase[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchPurchases = useCallback(async () => {
+    if (!user?.id) {
+      setPurchases([])
+      setLoading(false)
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await apiClient.getUserPurchases(user.id)
+      setPurchases(response.purchases)
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch purchases')
+      console.error('Error fetching user purchases:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    fetchPurchases()
+  }, [fetchPurchases])
+
+  return {
+    purchases,
+    loading,
+    error,
+    refetch: fetchPurchases
   }
 }

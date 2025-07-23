@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { withBuyerProtection } from "@/components/auth/with-role-protection"
 import { Button } from "@/components/ui/button"
@@ -28,6 +28,13 @@ function CartPage() {
   const [showPaymentUrl, setShowPaymentUrl] = useState(false)
   const [paymentUrl, setPaymentUrl] = useState('')
 
+  // Ensure payment method defaults to card (only enabled option)
+  useEffect(() => {
+    if (paymentMethod !== 'card') {
+      setPaymentMethod('card')
+    }
+  }, [paymentMethod, setPaymentMethod])
+
   const handlePurchaseTickets = async () => {
     if (!user) {
       toast.error('Please sign in to purchase tickets')
@@ -37,6 +44,13 @@ function CartPage() {
 
     if (items.length === 0) {
       toast.error('Your cart is empty')
+      return
+    }
+
+    // Ensure only card payment is allowed
+    if (paymentMethod !== 'card') {
+      toast.error('Only Credit/Debit Card payment is currently available')
+      setPaymentMethod('card')
       return
     }
 
@@ -87,6 +101,39 @@ function CartPage() {
         const result = await response.json()
 
         if (response.ok && result.data?.paymentUrl) {
+
+          // Send email with QR code (non-blocking)
+          try {
+            await fetch("/api/mails", {
+              method: "POST",
+              body: JSON.stringify({
+                email: user.email,
+                type: "new_order",
+                orderNumber: result.data.id,
+                qrCode: result.data.qr_code,
+                totalAmount: totalAmount,
+                items: items.map(item => ({
+                  name: item.ticketTypeName,
+                  size: item.eventTitle,
+                  quantity: item.quantity,
+                  price: item.price * item.quantity
+                })),
+                firstName: user.user_metadata?.first_name || "",
+                orderUrl: `${process.env.NEXT_PUBLIC_WEB_URL}/confirmation?purchaseId=${result.data.id}`
+              }),
+            });
+          } catch (emailError) {
+            console.error('Error sending email:', emailError);
+            // Don't block the order process if email fails
+          }
+
+          if (result.error) {
+            console.error('Error creating order:', Error)
+            alert('Error al crear el pedido. Intenta nuevamente.')
+            setIsProcessing(false)
+            return
+          }
+
           // Store purchase ID in localStorage to update status after payment
           localStorage.setItem('pendingPurchaseId', purchase.id)
           localStorage.setItem('cartItems', JSON.stringify(items))
@@ -107,7 +154,7 @@ function CartPage() {
         })
 
         clearCart()
-        router.push('/tickets')
+        // router.push('/tickets')
       }
 
     } catch (error: any) {
@@ -155,25 +202,27 @@ function CartPage() {
 
   if (items.length === 0) {
     return (
-      <div className="container mx-auto max-w-2xl p-4 md:p-8">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-3xl font-bold">Your Cart</h1>
-        </div>
+      <SharedLayout>
+        <div className="container mx-auto max-w-2xl p-4 md:p-8">
+          <div className="flex items-center gap-4 mb-6">
+            <Button variant="ghost" size="icon" onClick={() => router.back()}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-3xl font-bold">Your Cart</h1>
+          </div>
 
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <ShoppingCart className="h-16 w-16 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Your cart is empty</h2>
-            <p className="text-muted-foreground mb-6">Add some tickets to get started!</p>
-            <Link href="/events">
-              <Button>Browse Events</Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+          <Card className="bg-zinc-900/50 border-zinc-800">
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <ShoppingCart className="h-16 w-16 text-muted-foreground mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Your cart is empty</h2>
+              <p className="text-muted-foreground mb-6">Add some tickets to get started!</p>
+              <Link href="/events">
+                <Button>Browse Events</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </SharedLayout>
     )
   }
 
@@ -248,9 +297,14 @@ function CartPage() {
 
             {/* Payment Method Selection */}
             <div className="space-y-3">
-              <Label htmlFor="payment-method" className="text-sm font-medium">
-                Payment Method
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="payment-method" className="text-sm font-medium">
+                  Payment Method
+                </Label>
+                <span className="text-xs text-muted-foreground">
+                  Only card payments available
+                </span>
+              </div>
               <Select value={paymentMethod} onValueChange={(value: PaymentMethod) => setPaymentMethod(value)}>
                 <SelectTrigger className="w-full">
                   <SelectValue>
@@ -267,28 +321,32 @@ function CartPage() {
                       <span>Credit/Debit Card</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="wallet">
-                    <div className="flex items-center gap-2">
+                  <SelectItem value="wallet" disabled>
+                    <div className="flex items-center gap-2 opacity-50">
                       <Wallet className="h-4 w-4" />
                       <span>Digital Wallet</span>
+                      <span className="text-xs text-muted-foreground ml-auto">(Coming Soon)</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="promo_code">
-                    <div className="flex items-center gap-2">
+                  <SelectItem value="promo_code" disabled>
+                    <div className="flex items-center gap-2 opacity-50">
                       <Gift className="h-4 w-4" />
                       <span>Promo Code</span>
+                      <span className="text-xs text-muted-foreground ml-auto">(Coming Soon)</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="cash">
-                    <div className="flex items-center gap-2">
+                  <SelectItem value="cash" disabled>
+                    <div className="flex items-center gap-2 opacity-50">
                       <Banknote className="h-4 w-4" />
                       <span>Cash</span>
+                      <span className="text-xs text-muted-foreground ml-auto">(Coming Soon)</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="bank_transfer">
-                    <div className="flex items-center gap-2">
+                  <SelectItem value="bank_transfer" disabled>
+                    <div className="flex items-center gap-2 opacity-50">
                       <Building className="h-4 w-4" />
                       <span>Bank Transfer</span>
+                      <span className="text-xs text-muted-foreground ml-auto">(Coming Soon)</span>
                     </div>
                   </SelectItem>
                 </SelectContent>
@@ -314,21 +372,37 @@ function CartPage() {
               </div>
             </div>
 
-            <Button
-              size="lg"
-              className="w-full bg-lime-400 text-black hover:bg-lime-500"
-              onClick={handlePurchaseTickets}
-              disabled={isProcessing}
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                'Continue'
-              )}
-            </Button>
+            <div className="flex gap-3">
+              <Button
+                size="lg"
+                variant="outline"
+                className="flex-1 border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                onClick={() => {
+                  clearCart()
+                  toast.success('Cart cleared')
+                }}
+                disabled={isProcessing}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Clear Cart
+              </Button>
+
+              <Button
+                size="lg"
+                className="flex-1 bg-lime-400 text-black hover:bg-lime-500"
+                onClick={handlePurchaseTickets}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'Continue'
+                )}
+              </Button>
+            </div>
           </CardFooter>
         </Card>
 
@@ -339,12 +413,13 @@ function CartPage() {
           onClose={() => {
             setShowPaymentUrl(false)
             setPaymentUrl('')
+            // Clear cart when user manually closes the modal
+            clearCart()
           }}
           onConfirm={() => {
-            // Clear cart after payment is initiated
-            clearCart()
-            // Redirect to a pending payment page or tickets page
-            router.push('/tickets?status=pending')
+            // This will be called when payment is completed successfully
+            // For now, we don't need to do anything here since the modal stays open
+            // until user closes it or payment is completed
           }}
         />
       </div>

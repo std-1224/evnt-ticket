@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
 } from "@/components/ui/sidebar"
-import { Home, Ticket, Calendar, User, LifeBuoy, LogOut, Settings, BarChart3, Users, QrCode, ShoppingCart } from "lucide-react"
+import { Home, Ticket, Calendar, User, LifeBuoy, LogOut, Settings, BarChart3, Users, QrCode, ShoppingCart, Receipt } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "./ui/button"
@@ -34,6 +34,11 @@ const clientMenuItems = [
     title: "My Tickets",
     url: "/tickets",
     icon: Ticket,
+  },
+  {
+    title: "My Orders",
+    url: "/orders",
+    icon: Receipt,
   },
   {
     title: "Shopping Cart",

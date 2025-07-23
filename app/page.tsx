@@ -9,7 +9,21 @@ import RootLayout from "./layout"
 import { RoleBasedLayout } from "@/components/role-based-layout"
 
 export default function HomePage() {
-  const { userRole, hasAnyRole } = useAuth()
+  const { userRole, hasAnyRole, isAuthenticated, isLoading  } = useAuth()
+
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-lime-400 rounded-lg animate-pulse" />
+      </div>
+    )
+  }
+
+  // Show guest home for non-authenticated users
+  if (!isAuthenticated) {
+    return <GuestHome userRole={userRole} />
+  }
+
 
   // Determine navigation based on user role
   const getMainActionLink = () => {

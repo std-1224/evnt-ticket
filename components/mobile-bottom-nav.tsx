@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Ticket, Calendar, User } from "lucide-react"
+import { Home, Ticket, Calendar, User, Receipt } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -20,6 +20,11 @@ const menuItems = [
     title: "Tickets",
     url: "/tickets",
     icon: Ticket,
+  },
+  {
+    title: "Orders",
+    url: "/orders",
+    icon: Receipt,
   },
   {
     title: "Profile",

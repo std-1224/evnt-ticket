@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { withBuyerProtection } from "@/components/auth/with-role-protection";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Calendar, Clock, Download } from "lucide-react";
+import { MapPin, Calendar, Clock, Download, RefreshCw } from "lucide-react";
 import Image from "next/image";
 import { useUserTickets } from "@/hooks/use-events";
 import { formatDate, formatTime, formatPrice } from "@/lib/api";
@@ -12,10 +12,27 @@ import { useAuth } from "@/contexts/auth-context";
 import { QRCodeDisplay, downloadQRCode } from "@/components/qr-code";
 import Link from "next/link";
 import { SharedLayout } from "@/components/shared-layout";
+import { useState, useEffect } from "react";
 
 function MyTicketsPage() {
   const { user } = useAuth();
-  const { tickets, loading, error } = useUserTickets();
+  const { tickets, loading, error, retrying, refetch } = useUserTickets();
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+
+  // Set a timeout for loading state to detect infinite loading
+  useEffect(() => {
+    if (loading) {
+      const timeout = setTimeout(() => {
+        setLoadingTimeout(true);
+      }, 100);
+      return () => {
+        clearTimeout(timeout);
+        setLoadingTimeout(false);
+      };
+    } else {
+      setLoadingTimeout(false);
+    }
+  }, [loading]);
 
   if (!user) {
     return (
@@ -35,40 +52,83 @@ function MyTicketsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-4 md:p-8">
-        <h1 className="text-3xl font-bold mb-8">My Tickets</h1>
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading your tickets...</p>
+      <SharedLayout>
+        <div className="container mx-auto p-4 md:p-8">
+          <div className="flex items-center justify-between mb-8">
+            <h1 className="text-3xl font-bold">My Tickets</h1>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refetch}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">
+              {loadingTimeout
+                ? "This is taking longer than expected. Please try refreshing."
+                : retrying
+                ? "Retrying connection..."
+                : "Loading your tickets..."
+              }
+            </p>
+            {loadingTimeout && (
+              <Button
+                onClick={refetch}
+                className="mt-4"
+                variant="outline"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+      </SharedLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="container mx-auto p-4 md:p-8">
-        <h1 className="text-3xl font-bold mb-8">My Tickets</h1>
-        <div className="text-center py-12">
-          <p className="text-destructive mb-4">
-            Error loading tickets: {error}
-          </p>
-          <Button onClick={() => window.location.reload()}>Try Again</Button>
+      <SharedLayout>
+        <div className="container mx-auto p-4 md:p-8">
+          <h1 className="text-3xl font-bold mb-8">My Tickets</h1>
+          <div className="text-center py-12">
+            <p className="text-destructive mb-4">
+              Error loading tickets: {error}
+            </p>
+            <Button onClick={refetch}>Try Again</Button>
+          </div>
         </div>
-      </div>
+      </SharedLayout>
     );
   }
 
   return (
     <SharedLayout>
       <div className="container mx-auto p-4 md:p-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">My Tickets</h1>
-          <p className="text-muted-foreground">
-            {tickets.length === 0
-              ? "You haven't purchased any tickets yet"
-              : `You have ${tickets.length} ticket(s)`}
-          </p>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">My Tickets</h1>
+            <p className="text-muted-foreground">
+              {tickets.length === 0
+                ? "You haven't purchased any tickets yet"
+                : `You have ${tickets.length} ticket(s)`}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refetch}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
 
         {tickets.length === 0 ? (
@@ -101,8 +161,8 @@ function MyTicketsPage() {
                         ticket.status === "paid"
                           ? "secondary"
                           : ticket.status === "validated"
-                          ? "secondary"
-                          : "outline"
+                            ? "secondary"
+                            : "outline"
                       }
                       className={
                         ticket.status === "paid"

@@ -11,11 +11,11 @@ import { formatDate, formatTime, formatPrice } from "@/lib/api"
 import { useEvent, useTicketQuantities } from "@/hooks/use-events"
 import { useAuth } from "@/contexts/auth-context"
 import { useCart } from "@/contexts/cart-context"
-import { RoleBasedLayout } from "@/components/role-based-layout"
+import { SharedLayout } from "@/components/shared-layout"
 import { toast } from "sonner"
-import { SharedLayout } from '@/components/shared-layout'
+import { withBuyerProtection } from '@/components/auth/with-role-protection'
 
-export default function EventDetailsPage() {
+function EventDetailsPage() {
   const params = useParams()
   const router = useRouter()
   const eventId = params.id as string
@@ -86,31 +86,31 @@ export default function EventDetailsPage() {
 
   if (!eventId || !isValidUUID) {
     return (
-      <RoleBasedLayout>
+      <SharedLayout>
         <div className="text-center py-12">
           <p className="text-destructive mb-4">Invalid event ID</p>
           <Link href="/events">
             <Button>Back to Events</Button>
           </Link>
         </div>
-      </RoleBasedLayout>
+      </SharedLayout>
     )
   }
 
   if (loading) {
     return (
-      <RoleBasedLayout>
+      <SharedLayout>
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-muted-foreground">Loading event details...</p>
         </div>
-      </RoleBasedLayout>
+      </SharedLayout>
     )
   }
 
   if (error || !event) {
     return (
-      <RoleBasedLayout>
+      <SharedLayout>
         <div className="text-center py-12">
           <p className="text-destructive mb-4">
             {error || 'Event not found'}
@@ -119,13 +119,12 @@ export default function EventDetailsPage() {
             <Button>Back to Events</Button>
           </Link>
         </div>
-      </RoleBasedLayout>
+      </SharedLayout>
     )
   }
 
   return (
-    // <RoleBasedLayout>
-      <SharedLayout>
+    <SharedLayout>
       <div className="relative w-full h-64 md:h-96 rounded-2xl overflow-hidden mb-8">
         <Image
           src={event.image_url || "/placeholder.svg?height=384&width=1280"}
@@ -247,7 +246,8 @@ export default function EventDetailsPage() {
           </Card>
         </div>
       </div>
-      </SharedLayout>
-    // </RoleBasedLayout>
+    </SharedLayout>
   )
 }
+
+export default withBuyerProtection(EventDetailsPage);

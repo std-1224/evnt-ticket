@@ -17,7 +17,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import { Home, Ticket, Calendar, User, LifeBuoy, LogOut, ShoppingCart } from "lucide-react"
+import { Home, Ticket, Calendar, User, LifeBuoy, LogOut, ShoppingCart, Receipt } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useCart } from "@/contexts/cart-context"
 import { Badge } from "@/components/ui/badge"
@@ -38,6 +38,11 @@ const buyerMenuItems = [
     title: "My Tickets",
     url: "/tickets",
     icon: Ticket,
+  },
+  {
+    title: "My Orders",
+    url: "/orders",
+    icon: Receipt,
   },
   {
     title: "Shopping Cart",

@@ -8,20 +8,20 @@ import Image from "next/image"
 import Link from "next/link"
 import { formatDate, formatTime } from "@/lib/api"
 import { useEvents } from "@/hooks/use-events"
-import { RoleBasedLayout } from "@/components/role-based-layout"
 import { SharedLayout } from "@/components/shared-layout"
+import { withBuyerProtection } from "@/components/auth/with-role-protection"
 
-export default function EventsPage() {
+function EventsPage() {
   const { events, loading, error, refetch } = useEvents()
 
   if (loading) {
     return (
-      <RoleBasedLayout>
+      <SharedLayout>
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-muted-foreground">Loading events...</p>
         </div>
-      </RoleBasedLayout>
+      </SharedLayout>
     )
   }
 
@@ -122,3 +122,5 @@ export default function EventsPage() {
     </SharedLayout>
   )
 }
+
+export default withBuyerProtection(EventsPage)

@@ -56,7 +56,7 @@ export interface Purchase {
   user_id: string
   event_id: string
   total_price: number
-  status: 'pending' | 'paid' | 'validated'
+  status: 'pending' | 'paid' | 'validated' | 'cancelled'
   purchased_at: string
   payment_method: 'card' | 'wallet' | 'promo_code' | 'cash' | 'bank_transfer'
 }
@@ -93,7 +93,7 @@ export interface Ticket {
   id: string
   ticket_type_id: string
   event_id: string
-  status: 'pending' | 'paid' | 'validated'
+  status: 'pending' | 'paid' | 'validated' | 'cancelled'
   scanned_at?: string | null
   qr_code: string
   purchased_at: string
@@ -215,7 +215,7 @@ class SupabaseApiClient {
     return { purchase: data as Purchase }
   }
 
-  async updatePurchaseStatus(purchaseId: string, status: 'pending' | 'paid' | 'validated'): Promise<{ purchase: Purchase }> {
+  async updatePurchaseStatus(purchaseId: string, status: 'pending' | 'paid' | 'validated' | 'cancelled'): Promise<{ purchase: Purchase }> {
     const { data, error } = await supabase
       .from('purchases')
       .update({
@@ -233,7 +233,42 @@ class SupabaseApiClient {
     return { purchase: data as Purchase }
   }
 
-  async updateTicketsByPurchase(userId: string, eventId: string, status: 'pending' | 'paid' | 'validated'): Promise<{ tickets: Ticket[] }> {
+  async cancelPurchase(purchaseId: string): Promise<{ purchase: Purchase }> {
+    try {
+      // First get the purchase to get user and event info
+      const { purchase } = await this.getPurchase(purchaseId)
+
+      // Only allow cancellation of pending purchases
+      if (purchase.status !== 'pending') {
+        throw new Error(`Cannot cancel purchase with status: ${purchase.status}`)
+      }
+
+      // Update purchase status to cancelled
+      const { purchase: cancelledPurchase } = await this.updatePurchaseStatus(purchaseId, 'cancelled')
+
+      // Cancel associated tickets
+      const { error: ticketsError } = await supabase
+        .from('tickets')
+        .update({
+          status: 'cancelled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('purchaser_id', purchase.user_id)
+        .eq('event_id', purchase.event_id)
+        .eq('status', 'pending') // Only cancel pending tickets
+
+      if (ticketsError) {
+        console.error('Error cancelling tickets:', ticketsError)
+        // Don't throw error here, purchase cancellation is more important
+      }
+
+      return { purchase: cancelledPurchase }
+    } catch (error: any) {
+      throw new Error(`Failed to cancel purchase: ${error.message}`)
+    }
+  }
+
+  async updateTicketsByPurchase(userId: string, eventId: string, status: 'pending' | 'paid' | 'validated' | 'cancelled'): Promise<{ tickets: Ticket[] }> {
     const { data, error } = await supabase
       .from('tickets')
       .update({ status })
@@ -279,6 +314,42 @@ class SupabaseApiClient {
     }
 
     return { purchases: data || [] }
+  }
+
+  async getTicketsForPurchase(purchaseId: string): Promise<{ tickets: Ticket[] }> {
+    try {
+      // First get the purchase to get user_id and event_id
+      const { purchase } = await this.getPurchase(purchaseId)
+
+      // Get tickets for this user and event around the purchase time
+      // We'll get tickets purchased within 1 minute of the purchase time to account for any timing differences
+      const purchaseTime = new Date(purchase.purchased_at)
+      const startTime = new Date(purchaseTime.getTime() - 60000) // 1 minute before
+      const endTime = new Date(purchaseTime.getTime() + 60000) // 1 minute after
+
+      const { data, error } = await supabase
+        .from('tickets')
+        .select(`
+          *,
+          ticket_types(*),
+          events(*)
+        `)
+        .eq('purchaser_id', purchase.user_id)
+        .eq('event_id', purchase.event_id)
+        .gte('purchased_at', startTime.toISOString())
+        .lte('purchased_at', endTime.toISOString())
+        .order('purchased_at', { ascending: true })
+
+      if (error) {
+        throw new Error(`Failed to get tickets for purchase: ${error.message}`)
+      }
+
+      return { tickets: data || [] }
+    } catch (error: any) {
+      console.error('Error in getTicketsForPurchase:', error)
+      // If we can't get tickets, return empty array to not block the process
+      return { tickets: [] }
+    }
   }
 
   // Tickets methods
@@ -439,25 +510,96 @@ class SupabaseApiClient {
     return { attendee: data }
   }
 
-  async getUserTickets(userId: string): Promise<{ tickets: Ticket[] }> {
-    const { data, error } = await supabase
-      .from('tickets')
-      .select(`
-        *,
-        ticket_types(*),
-        events(*),
-        attendees(*)
-      `)
-      .eq('purchaser_id', userId)
+  // Database health check
+  async checkDatabaseHealth(): Promise<boolean> {
+    try {
+      const startTime = Date.now()
+      const { error } = await supabase
+        .from('tickets')
+        .select('id')
+        .limit(1)
 
-    if (error) {
-      handleSupabaseError(error)
+      const endTime = Date.now()
+      console.log(`Database health check completed in ${endTime - startTime}ms`)
+
+      return !error && endTime - startTime < 5000 // Consider healthy if responds within 5 seconds
+    } catch (err) {
+      console.error('Database health check failed:', err)
+      return false
     }
-
-    return { tickets: data || [] }
   }
 
-  async updateTicketStatus(ticketId: string, status: 'pending' | 'paid' | 'validated'): Promise<{ ticket: Ticket }> {
+  async getUserTickets(userId: string): Promise<{ tickets: Ticket[] }> {
+    try {
+      console.log('Starting getUserTickets for user:', userId)
+
+      // Quick health check first
+      const isHealthy = await this.checkDatabaseHealth()
+      if (!isHealthy) {
+        console.warn('Database appears to be slow, using simplified query')
+        // Use simplified query if database is slow
+        const { data, error } = await supabase
+          .from('tickets')
+          .select('*')
+          .eq('purchaser_id', userId)
+          .neq('status', 'pending')
+          .order('purchased_at', { ascending: false })
+          .limit(20)
+
+        if (error) {
+          handleSupabaseError(error)
+        }
+        return { tickets: data || [] }
+      }
+
+      const startTime = Date.now()
+
+      // Try the optimized query first
+      const { data, error } = await supabase
+        .from('tickets')
+        .select(`
+          *,
+          ticket_types(id, name, price, description),
+          events(id, title, date, time, location, image_url),
+          attendees(id, name, email)
+        `)
+        .eq('purchaser_id', userId)
+        .neq('status', 'pending') // Exclude pending tickets from tickets page
+        .order('purchased_at', { ascending: false })
+        .limit(50) // Limit to prevent huge queries
+
+      const endTime = Date.now()
+      console.log(`getUserTickets completed in ${endTime - startTime}ms, found ${data?.length || 0} tickets`)
+
+      if (error) {
+        console.error('Supabase error in getUserTickets:', error)
+
+        // If the complex query fails, try a simpler one
+        console.log('Trying fallback query without joins...')
+        const { data: simpleData, error: simpleError } = await supabase
+          .from('tickets')
+          .select('*')
+          .eq('purchaser_id', userId)
+          .neq('status', 'pending')
+          .order('purchased_at', { ascending: false })
+          .limit(50)
+
+        if (simpleError) {
+          handleSupabaseError(simpleError)
+        } else {
+          console.log(`Fallback query successful, found ${simpleData?.length || 0} tickets`)
+          return { tickets: simpleData || [] }
+        }
+      }
+
+      return { tickets: data || [] }
+    } catch (err) {
+      console.error('Unexpected error in getUserTickets:', err)
+      throw err
+    }
+  }
+
+  async updateTicketStatus(ticketId: string, status: 'pending' | 'paid' | 'validated' | 'cancelled'): Promise<{ ticket: Ticket }> {
     const { data, error } = await supabase
       .from('tickets')
       .update({ status })
